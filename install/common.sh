@@ -126,27 +126,41 @@ configure_default_shell() {
         return 0
     fi
 
-    # Attempt changing shell with chsh or usermod or sudo
     local changed=false
-    if chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
-        changed=true
-    elif chsh -s "$zsh_bin" 2>/dev/null; then
-        changed=true
-    elif has_cmd sudo && sudo -n true 2>/dev/null; then
-        if sudo chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
-            changed=true
-        elif sudo usermod -s "$zsh_bin" "$current_user" 2>/dev/null; then
+
+    # 1. If running as root, change directly with usermod or chsh
+    if [ "$EUID" -eq 0 ]; then
+        if usermod -s "$zsh_bin" "$current_user" 2>/dev/null || chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
             changed=true
         fi
+    # 2. If sudo is available with cached credentials, change via sudo without prompt
+    elif has_cmd sudo && sudo -n true 2>/dev/null; then
+        if sudo usermod -s "$zsh_bin" "$current_user" 2>/dev/null || sudo chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
+            changed=true
+        fi
+    # 3. If interactive, prompt user with visible stdout/stderr
+    elif [ "$NON_INTERACTIVE" = false ]; then
+        if has_cmd sudo; then
+            log_info "Updating default shell via sudo (password may be requested):"
+            if sudo usermod -s "$zsh_bin" "$current_user" 2>/dev/null || sudo chsh -s "$zsh_bin" "$current_user" 2>/dev/null || sudo usermod -s "$zsh_bin" "$current_user" || sudo chsh -s "$zsh_bin" "$current_user"; then
+                changed=true
+            fi
+        fi
+
+        if [ "$changed" = false ]; then
+            log_info "Updating default shell via chsh (password may be requested):"
+            if chsh -s "$zsh_bin"; then
+                changed=true
+            fi
+        fi
+    else
+        log_warn "Non-interactive mode: cannot prompt for password to change default shell."
     fi
 
     if [ "$changed" = true ]; then
         log_success "Default shell changed to zsh ($zsh_bin)."
-    elif [ "$NON_INTERACTIVE" = false ]; then
-        log_info "Please enter your password if prompted by chsh:"
-        chsh -s "$zsh_bin" || log_warn "Could not change default shell automatically. Run 'chsh -s $zsh_bin' manually."
     else
-        log_warn "Could not change default shell non-interactively without sudo. Please run 'chsh -s $zsh_bin' manually."
+        log_warn "Could not change default shell automatically. You can change it manually by running: chsh -s $zsh_bin"
     fi
 
     return 0
