@@ -14,6 +14,14 @@ alias ff='fastfetch'
 alias ls='eza -a --icons=always'
 alias ll='eza -al --icons=always'
 alias lt='eza -a --tree --level=1 --icons=always'
+
+# Debian/Ubuntu tool compatibility shims
+if not type -q bat; and type -q batcat
+    alias bat='batcat'
+end
+if not type -q fd; and type -q fdfind
+    alias fd='fdfind'
+end
 alias shutdown='~/.config/ml4w/scripts/ml4w-power -p'
 alias v='$EDITOR'
 alias vim='$EDITOR'

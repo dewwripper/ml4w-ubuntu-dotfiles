@@ -1,2 +1,5 @@
 .qodo/
 backups/
+.DS_Store
+*.tmp
+*.swp

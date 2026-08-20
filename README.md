@@ -79,11 +79,37 @@ A fully custom [Quickshell](https://quickshell.outfoxxed.me/) desktop shell, bui
 ## Additional Dependencies ⚠️
 - Using pear-desktop as the music app for META+M keybind
 
+## Supported Distributions 🐧
+
+- **Ubuntu / Debian**: Ubuntu 24.04 LTS+, Debian 12+ (APT + Fallback shims)
+- **Arch Linux**: CachyOS, Arch, EndeavourOS (Pacman / AUR)
+- **Fedora**: Fedora 40+ (DNF)
+- **openSUSE**: Tumbleweed & Leap (Zypper)
+
 ## Installation 🔧
 
-Just launch with bash the install.sh after cloning this repo
+Clone the repository and run the installation script:
 
-I just want to make it as simple as possible, unlike my previous garuda-hyprdots, so this can be used to setup a fully working hyprland setup on any arch based distros. 
+```bash
+git clone https://github.com/dewwripper/ml4w-ubuntu-dotfiles.git
+cd ml4w-ubuntu-dotfiles
+chmod +x install.sh
+./install.sh
+```
+
+### Installation Options
+
+```text
+Usage: ./install.sh [OPTIONS]
+
+Options:
+  -h, --help           Show help message and exit
+  -d, --dry-run        Simulate installation without modifying files or packages
+  -y, --noconfirm      Run non-interactively (accept all prompts)
+  -b, --bar <type>     Preferred status bar: 'quickshell' (default) or 'waybar'
+      --skip-backup    Skip configuration backup step
+      --skip-packages  Skip package installation (dotfiles sync only)
+```
 
 ## Special Thanks 🙏
 

@@ -1,161 +1,238 @@
 #!/bin/bash
+# ==============================================================================
+# ML4W Multi-Distro Dotfiles & Environment Installer
+# Supports: Ubuntu/Debian, Arch Linux, Fedora, openSUSE
+# ==============================================================================
 
-# ==========================================
-# 1. PATHS & VARIABLES
-# ==========================================
+set -e
+
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-TARGET_STORAGE="$HOME/.mydotfiles/com.ml4w.dotfiles"
-INSTALLER_DIR="$HOME/ml4w-dotfiles-installer"
+TARGET_STORAGE="${HOME}/.mydotfiles/com.ml4w.dotfiles"
+INSTALLER_DIR="${HOME}/ml4w-dotfiles-installer"
 PROFILE_URL="https://raw.githubusercontent.com/mylinuxforwork/dotfiles/main/hyprland-dotfiles.dotinst"
 
-echo "📂 Repo: $REPO_ROOT"
-echo "📂 Storage: $TARGET_STORAGE"
+# Source helper modules
+# shellcheck source=install/common.sh
+source "${REPO_ROOT}/install/common.sh"
+# shellcheck source=install/os-detect.sh
+source "${REPO_ROOT}/install/os-detect.sh"
+# shellcheck source=install/backup.sh
+source "${REPO_ROOT}/install/backup.sh"
+# shellcheck source=install/distros/ubuntu.sh
+source "${REPO_ROOT}/install/distros/ubuntu.sh"
+# shellcheck source=install/distros/arch.sh
+source "${REPO_ROOT}/install/distros/arch.sh"
+# shellcheck source=install/distros/fedora.sh
+source "${REPO_ROOT}/install/distros/fedora.sh"
+# shellcheck source=install/distros/suse.sh
+source "${REPO_ROOT}/install/distros/suse.sh"
+# shellcheck source=install/fallbacks/quickshell.sh
+source "${REPO_ROOT}/install/fallbacks/quickshell.sh"
+# shellcheck source=install/fallbacks/tools.sh
+source "${REPO_ROOT}/install/fallbacks/tools.sh"
+# shellcheck source=install/fallbacks/fonts.sh
+source "${REPO_ROOT}/install/fallbacks/fonts.sh"
 
-# ==========================================
-# 2. INSTALL DEPENDENCIES (cava, zoxide, rsync)
-# ==========================================
-echo -e "\n========================================"
-echo "📦 Installing Dependencies"
-echo "========================================"
-# Loop through required packages to install them cleanly
-for pkg in cava zoxide rsync socat; do
-    if ! command -v "$pkg" &> /dev/null; then
-        echo "📦 $pkg not found. Installing..."
-        # Added --noconfirm so the script doesn't pause waiting for "Y"
-        sudo pacman -Sy --noconfirm "$pkg" || echo "⚠️ Warning: Failed to install $pkg. You may need to do it manually."
-    else
-        echo "✅ $pkg is already installed."
-    fi
+# Default flags
+DRY_RUN=false
+NON_INTERACTIVE=false
+SKIP_BACKUP=false
+SKIP_PACKAGES=false
+PREFERRED_BAR="quickshell"
+
+show_help() {
+    cat << 'EOF'
+ML4W Multi-Distro Dotfiles Installer
+
+Usage:
+  ./install.sh [OPTIONS]
+
+Options:
+  -h, --help           Show this help message and exit
+  -d, --dry-run        Simulate installation without modifying files or packages
+  -y, --noconfirm      Run non-interactively (accept all prompts)
+  -b, --bar <type>     Preferred status bar: 'quickshell' (default) or 'waybar'
+      --skip-backup    Skip configuration backup step
+      --skip-packages  Skip package installation (dotfiles sync only)
+
+Supported Distributions:
+  • Ubuntu 24.04 LTS+ / Debian 12+
+  • Arch Linux / CachyOS / EndeavourOS
+  • Fedora 40+
+  • openSUSE Tumbleweed / Leap
+EOF
+    exit 0
+}
+
+# Parse command line options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -d|--dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -y|--noconfirm|--yes)
+            NON_INTERACTIVE=true
+            shift
+            ;;
+        -b|--bar)
+            PREFERRED_BAR="$2"
+            shift 2
+            ;;
+        --skip-backup)
+            SKIP_BACKUP=true
+            shift
+            ;;
+        --skip-packages)
+            SKIP_PACKAGES=true
+            shift
+            ;;
+        *)
+            log_error "Unknown option: $1"
+            show_help
+            ;;
+    esac
 done
 
-# ==========================================
-# 3. OFFICIAL ML4W UPDATE / INSTALLATION
-# ==========================================
-echo -e "\n========================================"
-echo "🚀 Installing ML4W Dotfiles..."
-echo "========================================"
-if [ ! -d "$INSTALLER_DIR" ]; then
-    git clone https://github.com/mylinuxforwork/ml4w-dotfiles-installer.git "$INSTALLER_DIR"
-else
-    echo "🔄 Updating ML4W Installer..."
-    cd "$INSTALLER_DIR" && git pull && cd "$REPO_ROOT"
+export DRY_RUN NON_INTERACTIVE
+
+# ==============================================================================
+# 1. OS DETECTION
+# ==============================================================================
+log_header "🔍 Host Environment Detection"
+detect_os || {
+    log_error "Unsupported host operating system."
+    exit 2
+}
+
+log_info "Detected OS: ${OS_ID} (Family: ${OS_FAMILY}, ID_LIKE: ${OS_ID_LIKE:-none}, Version: ${OS_VERSION_ID:-unknown})"
+log_info "Target Package Manager: ${PKG_MANAGER:-none}"
+log_info "Repository Root: ${REPO_ROOT}"
+log_info "Target Dotfiles Storage: ${TARGET_STORAGE}"
+
+if [ "$DRY_RUN" = true ]; then
+    log_dry "Dry-run mode active. No filesystem or system modifications will be committed."
 fi
 
-cd "$INSTALLER_DIR"
-make install
-
-# This command is synchronous. The script will wait here until ML4W finishes its job.
-echo "⏳ Running ML4W Profile Installer..."
-~/.local/bin/ml4w-dotfiles-installer --install "$PROFILE_URL"
-echo "✅ ML4W installation phase completed."
-
-# ==========================================
-# 4. OVERRIDE WITH YOUR CUSTOM DOTFILES
-# ==========================================
-echo -e "\n========================================"
-echo "🔄 Applying Custom Overrides"
-echo "========================================"
-# Create the config folder just in case
-mkdir -p "$TARGET_STORAGE/.config"
-
-# We use rsync instead of cp. Rsync perfectly merges directories without 
-# failing on symlink loops or skipping existing files.
-# -a: archive (recursive, preserves attributes)
-# -L: transforms symlinks into real files (solves the circular loop issue)
-echo "📂 Merging REPO_ROOT into TARGET_STORAGE..."
-if command -v rsync &> /dev/null; then
-    rsync -aL --exclude='.git/' "$REPO_ROOT/.config/" "$TARGET_STORAGE/.config/"
+# ==============================================================================
+# 2. CONFIGURATION BACKUP
+# ==============================================================================
+if [ "$SKIP_BACKUP" = false ]; then
+    log_header "💾 Pre-Installation Backup"
+    create_backup
 else
-    # Fallback just in case rsync fails to install
-    cp -rLf "$REPO_ROOT/.config/"* "$TARGET_STORAGE/.config/"
+    log_info "Skipping pre-installation backup as requested."
 fi
 
-# Ensure custom scripts remain executable after rsync
-chmod +x "$TARGET_STORAGE/.config/hypr/conf/custom/workspace-wallpapers.sh" 2>/dev/null || true
+# ==============================================================================
+# 3. DISTRIBUTION PACKAGES INSTALLATION
+# ==============================================================================
+if [ "$SKIP_PACKAGES" = false ]; then
+    case "$OS_FAMILY" in
+        DEBIAN)
+            install_ubuntu_packages
+            ;;
+        ARCH)
+            install_arch_packages
+            ;;
+        FEDORA)
+            install_fedora_packages
+            ;;
+        SUSE)
+            install_suse_packages
+            ;;
+        *)
+            log_warn "Unknown OS family ($OS_FAMILY). Skipping distro-specific package manager."
+            ;;
+    esac
 
-# ==========================================
-# 5. SPECIFIC FILE FAILSAFES
-# ==========================================
-# The rsync command above technically copies all of this already if they are inside 
-# your .config folder, but keeping these ensures your most important files are 100% applied.
+    # 4. FALLBACK DEPLOYERS (Tools, Quickshell, Fonts)
+    log_header "🚀 Fallback & User-Level Asset Deployment"
+    install_tools_fallbacks
+    install_fonts_fallback
 
-echo "📂 Enforcing critical shell and quickshell files..."
-# Quickshell
-mkdir -p "$TARGET_STORAGE/.config/quickshell"
-cp -f "$REPO_ROOT/.config/quickshell/shell.qml" "$TARGET_STORAGE/.config/quickshell/shell.qml" 2>/dev/null
+    if [[ "$PREFERRED_BAR" == "quickshell" ]]; then
+        install_quickshell_fallback
+    fi
+else
+    log_info "Skipping package installation and fallbacks as requested."
+fi
 
-# Shell settings
-mkdir -p "$TARGET_STORAGE/.config/bashrc" "$TARGET_STORAGE/.config/zshrc" "$TARGET_STORAGE/.config/fish/conf.d"
-cp -f "$REPO_ROOT/.config/bashrc/zoxide" "$TARGET_STORAGE/.config/bashrc/zoxide" 2>/dev/null
-cp -f "$REPO_ROOT/.config/fish/conf.d/zoxide.fish" "$TARGET_STORAGE/.config/fish/conf.d/zoxide.fish" 2>/dev/null
-cp -f "$REPO_ROOT/.config/zshrc/zoxide" "$TARGET_STORAGE/.config/zshrc/zoxide" 2>/dev/null
-cp -f "$REPO_ROOT/.config/fish/conf.d/10-aliases.fish" "$TARGET_STORAGE/.config/fish/conf.d/10-aliases.fish" 2>/dev/null
-cp -f "$REPO_ROOT/.config/bashrc/10-aliases" "$TARGET_STORAGE/.config/bashrc/10-aliases" 2>/dev/null
-cp -f "$REPO_ROOT/.config/zshrc/25-aliases" "$TARGET_STORAGE/.config/zshrc/25-aliases" 2>/dev/null
+# ==============================================================================
+# 5. UPSTREAM ML4W PROFILE (ARCH ONLY)
+# ==============================================================================
+if [[ "$OS_FAMILY" == "ARCH" && "$SKIP_PACKAGES" = false ]]; then
+    log_header "📦 Upstream ML4W Profile Installer"
+    if [ ! -d "$INSTALLER_DIR" ]; then
+        run_cmd git clone https://github.com/mylinuxforwork/ml4w-dotfiles-installer.git "$INSTALLER_DIR"
+    else
+        log_info "Updating ML4W Installer..."
+        if [ "$DRY_RUN" = false ]; then
+            (cd "$INSTALLER_DIR" && git pull) || true
+        fi
+    fi
 
+    if [ "$DRY_RUN" = false ] && [ -d "$INSTALLER_DIR" ]; then
+        (cd "$INSTALLER_DIR" && make install) || true
+        if [ -x "$HOME/.local/bin/ml4w-dotfiles-installer" ]; then
+            log_info "Running ML4W Profile Installer..."
+            "$HOME/.local/bin/ml4w-dotfiles-installer" --install "$PROFILE_URL" || true
+        fi
+    fi
+fi
+
+# ==============================================================================
+# 6. OVERRIDE WITH CUSTOM DOTFILES
+# ==============================================================================
+log_header "🔄 Applying Custom Dotfile Overrides"
+
+run_cmd mkdir -p "$TARGET_STORAGE/.config"
+
+log_info "Merging custom dotfiles into $TARGET_STORAGE/.config/..."
+if has_cmd rsync; then
+    run_cmd rsync -aL --exclude='.git/' "$REPO_ROOT/.config/" "$TARGET_STORAGE/.config/"
+else
+    run_cmd cp -rLf "$REPO_ROOT/.config/"* "$TARGET_STORAGE/.config/"
+fi
+
+# Ensure custom scripts remain executable
+run_cmd chmod +x "$TARGET_STORAGE/.config/hypr/conf/custom/workspace-wallpapers.sh" 2>/dev/null || true
+
+# Specific failsafes
+log_info "Enforcing critical shell and quickshell files..."
+run_cmd mkdir -p "$TARGET_STORAGE/.config/quickshell"
+run_cmd cp -f "$REPO_ROOT/.config/quickshell/shell.qml" "$TARGET_STORAGE/.config/quickshell/shell.qml" 2>/dev/null || true
+
+run_cmd mkdir -p "$TARGET_STORAGE/.config/bashrc" "$TARGET_STORAGE/.config/zshrc" "$TARGET_STORAGE/.config/fish/conf.d"
+run_cmd cp -f "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles/.config/bashrc/10-aliases" "$TARGET_STORAGE/.config/bashrc/10-aliases" 2>/dev/null || true
+run_cmd cp -f "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles/.config/zshrc/25-aliases" "$TARGET_STORAGE/.config/zshrc/25-aliases" 2>/dev/null || true
+run_cmd cp -f "$REPO_ROOT/.config/fish/conf.d/10-aliases.fish" "$TARGET_STORAGE/.config/fish/conf.d/10-aliases.fish" 2>/dev/null || true
+
+log_header "✅ Installation & Synchronization Summary"
 echo "
 ============================================================
-        ✅ CUSTOM DOTFILES CHANGES SUMMARY
+        ✅ ML4W DOTFILES SETUP COMPLETED SUCCESSFULLY
 ============================================================
 
-🐚 Custom Quickshell Bar (replaces Waybar)
-   • Top bar: workspaces w/ app icons, system tray, media pill,
-     mic/brightness/volume ring controls, kb layout, notifications,
-     clock, network/bluetooth/battery pill, instant OSD + screen frame
-   • Multi-monitor aware — popups open on the monitor under your mouse
-   • Popups (keybinding or click):
-     → Media (META+M): MPRIS player, Cava visualizer, sink switcher
-     → Calendar (META+C): calendar + weather + world clock
-     → System/Network (META+N): Wi-Fi, Bluetooth, network
-     → Dashboard (META+I): system info, mounted disks & drives
-     → Dock (META+A): app launcher w/ keyboard nav, notes, todo, screenshots
-     → Clipboard (META+SHIFT+V): clipboard history (cliphist)
-     → Keyboard Layout (META+SHIFT+K): switch layout/variant
-     → Power (META+X): power menu with keyboard selection
-     → Radial Menu (META+R) + Display Manager (META+ALT+M)
+Host Operating System: ${OS_ID} (${OS_FAMILY})
+Status Bar Mode:       ${PREFERRED_BAR}
+Dotfile Storage:       ${TARGET_STORAGE}
 
-🎨 ML4W Theme & Wallpaper Customizations
-   • ml4w-toggle-theme: Added 'Save' theme mode variable
-     → Theme stays consistent after waybar/matugen changes
-   • darkmode: Custom darkmode state file preserved
-   • ml4w-wallpaper: Added darkmode variable
-     → Matugen won't override darkmode unless desired
+🐚 Desktop Shell:
+   • Quickshell Bar (Default) with instant OSD, popups & window frame
+   • Waybar (Fallback configuration preserved in ~/.config/waybar)
 
-🖼️ Per-Workspace Wallpapers
-   • workspace-wallpapers.sh: Different wallpaper per Hyprland workspace
-     → Autostarted via ~/.config/hypr/conf/custom/autostart.lua
-   • WorkspaceWallpaperAPP: Separate Quickshell app to select wallpapers per workspace
-     → Open with SUPER + SHIFT + E
-     → Saves assignments to ~/.config/hypr/conf/custom/workspace-wallpapers.json
+🎨 Theme & Appearance:
+   • MesloLGS & JetBrainsMono Nerd Fonts
+   • Papirus / Adwaita icon themes & dark mode integration
 
-📸 Screenshot & Colorpicker Enhancements
-   • screenshot.sh: Screenshots now copied to clipboard
-     + saved to file (dual functionality)
-   • colorpicker.sh: Added hyprpicker integration
-     → Press META+P to pick colors
+⌨️ Command Shims:
+   • bat (aliased to batcat on Ubuntu/Debian)
+   • fd  (aliased to fdfind on Ubuntu/Debian)
+   • eza, fastfetch, starship, zoxide in ~/.local/bin/
 
-⌨️ Custom Keybindings
-   • META+D → Application launcher
-   • META+P → Colorpicker (hyprpicker)
-   • META+R → Radial menu
-   • META+ALT+M → Display manager
-   • Quickshell popups: META+M (media), META+C (calendar),
-     META+N (network/system), META+I (dashboard), META+A (dock),
-     META+SHIFT+V (clipboard), META+SHIFT+K (keyboard), META+X (power)
-   • Plus other custom overrides in default.conf
-
-🖥️ Fastfetch Customization
-   • Custom logo image added (you can replace it with your own)
-   • GPU information display enabled
-
-🐚 Shell Configuration Fixes
-   • zsh plugins: Fixed path issue for AUR vs git clone
-     → 00-init & 20-customization updated
-   • zoxide: Installed and initialized for bash/fish/zsh
-     → 'cd' alias with directory jumping available
-   • Aliases: Added for bash, fish, and zsh
-
-============================================================
-        All changes successfully saved!
 ============================================================
 "
