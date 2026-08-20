@@ -95,3 +95,60 @@ ensure_sudo() {
         }
     fi
 }
+
+# Change default shell to zsh
+configure_default_shell() {
+    log_header "🐚 Default Shell Configuration"
+    local zsh_bin
+    zsh_bin=$(command -v zsh 2>/dev/null || which zsh 2>/dev/null || echo "/usr/bin/zsh")
+
+    if ! has_cmd zsh && [ ! -x "$zsh_bin" ]; then
+        log_warn "zsh is not installed. Skipping default shell configuration."
+        return 0
+    fi
+
+    local current_user="${USER:-$(id -un 2>/dev/null || whoami)}"
+    local current_shell
+    if has_cmd getent; then
+        current_shell=$(getent passwd "$current_user" 2>/dev/null | cut -d: -f7 || echo "$SHELL")
+    else
+        current_shell="$SHELL"
+    fi
+
+    if [[ "$current_shell" == *"/zsh" ]]; then
+        log_info "Default shell is already zsh ($current_shell)."
+        return 0
+    fi
+
+    log_info "Changing default shell to zsh ($zsh_bin) for user $current_user..."
+    if [ "$DRY_RUN" = true ]; then
+        log_dry "chsh -s $zsh_bin $current_user"
+        return 0
+    fi
+
+    # Attempt changing shell with chsh or usermod or sudo
+    local changed=false
+    if chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
+        changed=true
+    elif chsh -s "$zsh_bin" 2>/dev/null; then
+        changed=true
+    elif has_cmd sudo && sudo -n true 2>/dev/null; then
+        if sudo chsh -s "$zsh_bin" "$current_user" 2>/dev/null; then
+            changed=true
+        elif sudo usermod -s "$zsh_bin" "$current_user" 2>/dev/null; then
+            changed=true
+        fi
+    fi
+
+    if [ "$changed" = true ]; then
+        log_success "Default shell changed to zsh ($zsh_bin)."
+    elif [ "$NON_INTERACTIVE" = false ]; then
+        log_info "Please enter your password if prompted by chsh:"
+        chsh -s "$zsh_bin" || log_warn "Could not change default shell automatically. Run 'chsh -s $zsh_bin' manually."
+    else
+        log_warn "Could not change default shell non-interactively without sudo. Please run 'chsh -s $zsh_bin' manually."
+    fi
+
+    return 0
+}
+

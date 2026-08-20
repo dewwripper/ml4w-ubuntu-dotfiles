@@ -211,6 +211,16 @@ run_cmd cp -f "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles/.config/bashrc/10-aliase
 run_cmd cp -f "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles/.config/zshrc/25-aliases" "$TARGET_STORAGE/.config/zshrc/25-aliases" 2>/dev/null || true
 run_cmd cp -f "$REPO_ROOT/.config/fish/conf.d/10-aliases.fish" "$TARGET_STORAGE/.config/fish/conf.d/10-aliases.fish" 2>/dev/null || true
 
+# Deploy root .zshrc
+log_info "Deploying Zsh configuration (.zshrc)..."
+run_cmd cp -f "$REPO_ROOT/.zshrc" "$TARGET_STORAGE/.zshrc" 2>/dev/null || true
+run_cmd cp -f "$REPO_ROOT/.zshrc" "$HOME/.zshrc" 2>/dev/null || true
+
+# ==============================================================================
+# 7. DEFAULT SHELL CONFIGURATION
+# ==============================================================================
+configure_default_shell
+
 log_header "✅ Installation & Synchronization Summary"
 echo "
 ============================================================
@@ -221,7 +231,8 @@ Host Operating System: ${OS_ID} (${OS_FAMILY})
 Status Bar Mode:       ${PREFERRED_BAR}
 Dotfile Storage:       ${TARGET_STORAGE}
 
-🐚 Desktop Shell:
+🐚 Desktop & User Shell:
+   • Default Shell: Zsh (configured via ~/.zshrc with Oh My Zsh)
    • Quickshell Bar (Default) with instant OSD, popups & window frame
    • Waybar (Fallback configuration preserved in ~/.config/waybar)
 

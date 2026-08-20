@@ -27,6 +27,8 @@ if [ -f /.dockerenv ] || [ "${RUN_FULL_TEST:-false}" = "true" ]; then
     echo "🧪 [Test 4/4] Verifying generated paths and shims..."
     test -d "$HOME/.mydotfiles/com.ml4w.dotfiles/.config"
     test -f "$HOME/.local/bin/quickshell" || test -f "$HOME/.local/bin/qs"
+    test -f "$HOME/.zshrc"
+    grep -q "oh-my-zsh" "$HOME/.zshrc"
 fi
 
 echo "✅ All Ubuntu verification tests passed successfully!"

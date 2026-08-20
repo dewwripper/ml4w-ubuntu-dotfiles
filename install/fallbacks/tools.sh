@@ -63,6 +63,29 @@ install_tools_fallbacks() {
         curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | BIN_DIR="${target_bin}" sh 2>/dev/null || true
     fi
 
+    # 5. Oh My Zsh and plugins
+    if [ ! -d "${HOME}/.oh-my-zsh" ]; then
+        log_info "Installing Oh My Zsh..."
+        git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "${HOME}/.oh-my-zsh" 2>/dev/null || true
+    fi
+
+    local zsh_custom="${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}"
+    if [ -d "${HOME}/.oh-my-zsh" ]; then
+        mkdir -p "${zsh_custom}/plugins"
+        if [ ! -d "${zsh_custom}/plugins/zsh-autosuggestions" ]; then
+            log_info "Installing zsh-autosuggestions..."
+            git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "${zsh_custom}/plugins/zsh-autosuggestions" 2>/dev/null || true
+        fi
+        if [ ! -d "${zsh_custom}/plugins/zsh-nvm" ]; then
+            log_info "Installing zsh-nvm..."
+            git clone --depth=1 https://github.com/lukechilds/zsh-nvm "${zsh_custom}/plugins/zsh-nvm" 2>/dev/null || true
+        fi
+        if [ ! -d "${zsh_custom}/plugins/zsh-syntax-highlighting" ]; then
+            log_info "Installing zsh-syntax-highlighting..."
+            git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "${zsh_custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        fi
+    fi
+
     log_success "CLI tools fallback check completed."
     return 0
 }
