@@ -191,6 +191,13 @@ log_header "🔄 Applying Custom Dotfile Overrides"
 
 run_cmd mkdir -p "$TARGET_STORAGE/.config"
 
+# Also sync base ML4W payload if present
+if [ -d "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles" ]; then
+    if has_cmd rsync; then
+        run_cmd rsync -a --exclude='.git/' "$REPO_ROOT/.mydotfiles/com.ml4w.dotfiles/" "$TARGET_STORAGE/"
+    fi
+fi
+
 log_info "Merging custom dotfiles into $TARGET_STORAGE/.config/..."
 if has_cmd rsync; then
     run_cmd rsync -aL --exclude='.git/' "$REPO_ROOT/.config/" "$TARGET_STORAGE/.config/"
@@ -215,6 +222,22 @@ run_cmd cp -f "$REPO_ROOT/.config/fish/conf.d/10-aliases.fish" "$TARGET_STORAGE/
 log_info "Deploying Zsh configuration (.zshrc)..."
 run_cmd cp -f "$REPO_ROOT/.zshrc" "$TARGET_STORAGE/.zshrc" 2>/dev/null || true
 run_cmd cp -f "$REPO_ROOT/.zshrc" "$HOME/.zshrc" 2>/dev/null || true
+
+# Link configurations into ~/.config
+log_info "Linking configurations into $HOME/.config/..."
+run_cmd mkdir -p "$HOME/.config"
+if [ "$DRY_RUN" = true ]; then
+    log_dry "Symlink configurations from $TARGET_STORAGE/.config/ into $HOME/.config/"
+else
+    for item in "$TARGET_STORAGE/.config/"*; do
+        [ -e "$item" ] || continue
+        base=$(basename "$item")
+        if [ -d "$HOME/.config/$base" ] && [ ! -L "$HOME/.config/$base" ]; then
+            rm -rf "$HOME/.config/$base"
+        fi
+        ln -sfn "$item" "$HOME/.config/$base" 2>/dev/null || true
+    done
+fi
 
 # ==============================================================================
 # 7. DEFAULT SHELL CONFIGURATION
