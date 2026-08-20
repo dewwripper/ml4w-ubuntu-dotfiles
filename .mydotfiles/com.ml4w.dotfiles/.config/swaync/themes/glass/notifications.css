@@ -1,0 +1,102 @@
+@import '../../colors.css';
+
+/* === Derived dynamic colors === */
+@define-color base alpha(@surface, 0.85); /* translucent blurred glass */
+@define-color surface_custom alpha(@surface_container_high, 0.05);
+@define-color hovercolor alpha(@primary, 0.1);
+@define-color activecolor @primary_container;
+
+@define-color buttoncolor alpha(@primary, 0.05);
+@define-color hoverbutton alpha(@primary, 0.15);
+@define-color activebutton @primary;
+
+@define-color bordercolor alpha(@primary, 0.15);
+@define-color fontcolor @on_surface;
+@define-color text @on_surface;
+
+/* === Global Reset === */
+* {
+  font-size: 1rem;
+  font-weight: 600;
+  all: unset;
+  font-family: "Fira Sans Semibold", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 6 Free", "Font Awesome 6 Brands", FontAwesome, Roboto, Helvetica, Arial, sans-serif;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.widget-mpris {
+  all: unset;
+}
+
+/* === Main Toast Card (Glass Style) === */
+.floating-notifications.background .notification-row .notification-background .notification {
+    background-color: alpha(@background, 0.8);
+    border-radius: 24px;
+    border: 2px solid alpha(@primary, 0.6);
+    color: @primary;
+    padding: 12px;
+    margin: 10px;
+    margin-right: 18px;
+    /* box-shadow: 0px 8px 20px 0px rgba(0, 0, 0, 0.15); */
+}
+
+/* Critical Toast */
+.floating-notifications.background .notification-row .notification-background .notification.critical {
+    background-color: alpha(#ff6b6b, 0.15);
+    border: 2px solid #ff6b6b;
+}
+
+/* Spacing Reset */
+.floating-notifications.background .notification-row .notification-background .notification .notification-content {
+    margin: 0rem;
+}
+
+.floating-notifications.background .notification-row .notification-background .notification > *:last-child > * {
+    min-height: 1.5em;
+}
+
+/* === Action Buttons (Interactive Glass Pills) === */
+.floating-notifications.background .notification-row .notification-background .notification > *:last-child > * .notification-action {
+    background-color: @surface_custom;
+    color: @primary;
+    border-radius: 14px;
+    margin: 6px;
+    padding: 8px 16px;
+    border: 1px solid @bordercolor;
+}
+
+.floating-notifications.background .notification-row .notification-background .notification > *:last-child > * .notification-action:hover {
+    background-color: @hovercolor;
+    border-radius: 18px;
+}
+
+.floating-notifications.background .notification-row .notification-background .notification > *:last-child > * .notification-action:active {
+    background-color: alpha(@primary, 0.2);
+}
+
+/* === Typography === */
+.summary {
+    color: @primary;
+    font-weight: 900;
+    font-size: 1.2rem;
+    padding: 5px 15px;
+}
+
+.body {
+    color: @primary;
+    background: transparent;
+    opacity: 0.8;
+    padding: 5px 15px;
+    font-size: 0.95rem;
+}
+
+/* === Close Button === */
+.floating-notifications.background .notification-row .notification-background .close-button {
+    background-color: alpha(@primary, 0.1);
+    border-radius: 12px;
+    color: @primary;
+    margin: 8px;
+    padding: 6px;
+}
+
+.floating-notifications.background .notification-row .notification-background .close-button:hover {
+    background-color: alpha(#ff6b6b,

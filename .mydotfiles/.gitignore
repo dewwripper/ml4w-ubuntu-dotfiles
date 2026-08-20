@@ -1,0 +1,7 @@
+# --- Directories ---
+backups/
+
+# --- Files ---
+.gtkrc-2.0
+.Xresources
+bookmarks
