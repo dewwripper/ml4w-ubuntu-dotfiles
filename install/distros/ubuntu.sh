@@ -44,15 +44,18 @@ install_ubuntu_packages() {
         "papirus-icon-theme"
         "adwaita-icon-theme"
         "fonts-font-awesome"
-        # Qt6 Runtime for Quickshell
+        # Qt6 Runtime for Quickshell & Modern Desktop
         "libqt6quick6"
         "libqt6qml6"
         "libqt6svg6"
+        "libqt6waylandclient6"
+        "qt6-qpa-plugins"
         "qml6-module-qtquick"
         "qml6-module-qtquick-controls"
         "qml6-module-qtquick-layouts"
         "qml6-module-qtquick-window"
         "qml6-module-qtquick-shapes"
+        "qml6-module-qtqml-workerscript"
         "qml6-module-qtcore"
         # Desktop & Wayland
         "waybar"
@@ -82,12 +85,16 @@ install_ubuntu_packages() {
         if [ "$DRY_RUN" = true ]; then
             log_dry "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${pkgs_to_install[*]}"
         else
-            # Install packages individually or collectively with fallback handling
+            # Install packages with graceful individual fallback
             for pkg in "${pkgs_to_install[@]}"; do
-                log_info "Installing $pkg..."
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$pkg" || {
-                    log_warn "Package '$pkg' could not be installed via standard APT. Will rely on fallbacks if available."
-                }
+                if apt-cache show "$pkg" &>/dev/null; then
+                    log_info "Installing $pkg..."
+                    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$pkg" || {
+                        log_warn "Package '$pkg' installation failed. Continuing with fallbacks..."
+                    }
+                else
+                    log_warn "Package '$pkg' not found in active APT repositories for ${OS_ID} ${OS_VERSION_ID:-26.04}. Will use fallbacks."
+                fi
             done
         fi
     else
@@ -96,19 +103,30 @@ install_ubuntu_packages() {
 
     # Check for Hyprland package on Ubuntu
     if ! has_cmd hyprland; then
-        log_info "Checking Hyprland availability on Ubuntu..."
+        log_info "Checking Hyprland availability on Ubuntu (${OS_VERSION_ID:-26.04})..."
         if [ "$DRY_RUN" = true ]; then
-            log_dry "Check/Add ppa:hyprland-community/hyprland if hyprland is missing"
+            log_dry "Check/Add ppa:hyprland-community/hyprland if hyprland is missing, with automatic 404 rollback"
         else
             if apt-cache show hyprland &>/dev/null; then
                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y hyprland || true
             else
-                log_info "Adding Hyprland Community PPA..."
-                sudo DEBIAN_FRONTEND=noninteractive add-apt-repository -y ppa:hyprland-community/hyprland 2>/dev/null || true
-                sudo DEBIAN_FRONTEND=noninteractive apt-get update -y 2>/dev/null || true
-                sudo DEBIAN_FRONTEND=noninteractive apt-get install -y hyprland 2>/dev/null || {
-                    log_warn "Hyprland could not be installed via PPA. Please verify Wayland desktop compositor manually."
-                }
+                log_info "Attempting Hyprland Community PPA configuration..."
+                local ppa_added=false
+                if sudo DEBIAN_FRONTEND=noninteractive add-apt-repository -y ppa:hyprland-community/hyprland 2>/dev/null; then
+                    ppa_added=true
+                    if ! sudo DEBIAN_FRONTEND=noninteractive apt-get update -y 2>/dev/null; then
+                        log_warn "Hyprland PPA lacks suite for ${OS_CODENAME:-$OS_VERSION_ID}. Removing invalid PPA to preserve APT health..."
+                        sudo DEBIAN_FRONTEND=noninteractive add-apt-repository --remove -y ppa:hyprland-community/hyprland 2>/dev/null || true
+                        sudo DEBIAN_FRONTEND=noninteractive apt-get update -y 2>/dev/null || true
+                        ppa_added=false
+                    fi
+                fi
+
+                if [ "$ppa_added" = true ]; then
+                    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y hyprland 2>/dev/null || {
+                        log_warn "Hyprland could not be installed from PPA."
+                    }
+                fi
             fi
         fi
     fi

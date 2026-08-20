@@ -1,0 +1,26 @@
+FROM ubuntu:rolling
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install bootstrapping packages on Ubuntu 26.04 / rolling
+RUN apt-get update && apt-get install -y \
+    sudo \
+    curl \
+    wget \
+    git \
+    rsync \
+    ca-certificates \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create testuser with passwordless sudo
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER testuser
+WORKDIR /home/testuser/ml4w-ubuntu-dotfiles
+
+# Copy repo content
+COPY --chown=testuser:testuser . .
+
+CMD ["./tests/test-ubuntu2604-container.sh"]

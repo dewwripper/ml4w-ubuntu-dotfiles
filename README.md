@@ -81,7 +81,7 @@ A fully custom [Quickshell](https://quickshell.outfoxxed.me/) desktop shell, bui
 
 ## Supported Distributions 🐧
 
-- **Ubuntu / Debian**: Ubuntu 24.04 LTS+, Debian 12+ (APT + Fallback shims)
+- **Ubuntu / Debian**: Ubuntu 26.04 LTS+, Ubuntu 24.04 LTS, Debian 12+ (APT + Modern Qt6 & Fallbacks)
 - **Arch Linux**: CachyOS, Arch, EndeavourOS (Pacman / AUR)
 - **Fedora**: Fedora 40+ (DNF)
 - **openSUSE**: Tumbleweed & Leap (Zypper)
